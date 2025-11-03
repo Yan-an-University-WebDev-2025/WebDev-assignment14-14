@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>单词记忆卡片 - 掌握状态切换</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-book"></i> 单词记忆卡片</h1>
+            <p class="subtitle">掌握状态切换功能演示</p>
+        </header>
+
+        <div class="main-content">
+            <!-- 卡片学习区域 -->
+            <div class="learning-section">
+                <div class="section-title">
+                    <i class="fas fa-graduation-cap"></i>
+                    <h2>学习卡片</h2>
+                </div>
+                
+                <div class="card-container">
+                    <div class="card">
+                        <div class="card-face card-front">
+                            <div class="empty-state">
+                                <i class="fas fa-plus-circle"></i>
+                                <h3>暂无单词卡片</h3>
+                                <p>请添加您的第一个单词卡片</p>
+                            </div>
+                        </div>
+                        <div class="card-face card-back">
+                            <div class="empty-state">
+                                <i class="fas fa-book-open"></i>
+                                <h3>添加单词后</h3>
+                                <p>这里将显示单词释义和例句</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card-actions">
+                    <button class="btn btn-know" disabled>
+                        <i class="fas fa-check-circle"></i> 认识
+                    </button>
+                    <button class="btn btn-dont-know" disabled>
+                        <i class="fas fa-times-circle"></i> 不认识
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 卡片管理区域 -->
+            <div class="management-section">
+                <div class="section-title">
+                    <i class="fas fa-plus-circle"></i>
+                    <h2>添加新卡片</h2>
+                </div>
+                
+                <form id="card-form">
+                    <div class="form-group">
+                        <label for="word">单词</label>
+                        <input type="text" id="word" placeholder="输入单词" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="meaning">释义</label>
+                        <input type="text" id="meaning" placeholder="输入单词释义" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="example">例句</label>
+                        <textarea id="example" placeholder="输入单词例句" required></textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-add">
+                        <i class="fas fa-plus"></i> 添加卡片
+                    </button>
+                </form>
+                
+                <div class="filter-section">
+                    <h3>筛选卡片</h3>
+                    <div class="filter-options">
+                        <button class="filter-btn active" data-filter="all">全部卡片</button>
+                        <button class="filter-btn" data-filter="unmastered">未掌握</button>
+                        <button class="filter-btn" data-filter="mastered">已掌握</button>
+                    </div>
+                </div>
+                
+                <h3>卡片列表</h3>
+                <div class="card-list" id="card-list">
+                    <div class="empty-state">暂无卡片</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 统计区域 -->
+        <div class="stats-section">
+            <div class="section-title">
+                <i class="fas fa-chart-line"></i>
+                <h2>学习统计</h2>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">总卡片数</div>
+                    <div class="stat-value" id="total-cards-stat">0</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-label">已掌握卡片</div>
+                    <div class="stat-value" id="mastered-cards-stat">0</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-label">学习进度</div>
+                    <div class="stat-value" id="progress-percent-stat">0%</div>
+                </div>
+            </div>
+            
+            <div class="progress-container">
+                <h3>学习进度</h3>
+                <div class="progress-bar">
+                    <div class="progress" id="progress-bar" style="width: 0%;"></div>
+                </div>
+                <div class="progress-text">
+                    <span>0%</span>
+                    <span>100%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 卡片数据结构
+        class Flashcard {
+            constructor(word, meaning, example) {
+                this.id = Date.now();
+                this.word = word;
+                this.meaning = meaning;
+                this.example = example;
+                this.mastered = false;
+                this.lastReviewed = null;
+                this.nextReview = null;
+            }
+        }
+
+        // 应用状态
+        const state = {
+            cards: [],
+            currentCardIndex: 0,
+            filter: 'all'
+        };
+
+        // DOM 元素
+        const elements = {
+            card: document.querySelector('.card'),
+            cardFront: document.querySelector('.card-front'),
+            cardBack: document.querySelector('.card-back'),
+            knowBtn: document.querySelector('.btn-know'),
+            dontKnowBtn: document.querySelector('.btn-dont-know'),
+            cardForm: document.getElementById('card-form'),
+            wordInput: document.getElementById('word'),
+            meaningInput: document.getElementById('meaning'),
+            exampleInput: document.getElementById('example'),
+            filterButtons: document.querySelectorAll('.filter-btn'),
+            totalCardsStat: document.getElementById('total-cards-stat'),
+            masteredCardsStat: document.getElementById('mastered-cards-stat'),
+            progressPercentStat: document.getElementById('progress-percent-stat'),
+            progressBar: document.getElementById('progress-bar'),
+            cardList: document.getElementById('card-list')
+        };
+
+        // 初始化应用
+        function initApp() {
+            loadCards();
+            setupEventListeners();
+            updateUI();
+        }
+
+        // 从 localStorage 加载卡片
+        function loadCards() {
+            const savedCards = localStorage.getItem('flashcards');
+            if (savedCards) {
+                state.cards = JSON.parse(savedCards);
+            }
+        }
+
+        // 保存卡片到 localStorage
+        function saveCards() {
+            localStorage.setItem('flashcards', JSON.stringify(state.cards));
+        }
+
+        // 设置事件监听器
+        function setupEventListeners() {
+            // 卡片翻转
+            elements.card.addEventListener('click', flipCard);
+            
+            // 认识/不认识按钮
+            elements.knowBtn.addEventListener('click', () => handleReview(true));
+            elements.dontKnowBtn.addEventListener('click', () => handleReview(false));
+            
+            // 添加新卡片表单
+            elements.cardForm.addEventListener('submit', addNewCard);
+            
+            // 筛选按钮
+            elements.filterButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    elements.filterButtons.forEach(btn => btn.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    state.filter = this.dataset.filter;
+                    updateUI();
+                });
+            });
+            
+            // 卡片列表事件委托（删除和切换掌握状态）
+            elements.cardList.addEventListener('click', function(e) {
+                const target = e.target;
+                const cardItem = target.closest('.card-item');
+                
+                if (!cardItem) return;
+                
+                const id = parseInt(cardItem.dataset.id);
+                
+                // 删除按钮
+                if (target.classList.contains('delete-btn')) {
+                    deleteCard(id);
+                }
+                
+                // 切换掌握状态按钮
+                if (target.classList.contains('toggle-mastery')) {
+                    toggleMastery(id);
+                }
+            });
+        }
+
+        // 翻转卡片
+        function flipCard() {
+            if (state.cards.length === 0) return;
+            elements.card.classList.toggle('flipped');
+        }
+
+        // 显示当前卡片
+        function showCurrentCard() {
+            if (state.cards.length === 0) {
+                elements.cardFront.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-plus-circle"></i>
+                        <h3>暂无单词卡片</h3>
+                        <p>请添加您的第一个单词卡片</p>
+                    </div>
+                `;
+                
+                elements.cardBack.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-book-open"></i>
+                        <h3>添加单词后</h3>
+                        <p>这里将显示单词释义和例句</p>
+                    </div>
+                `;
+                
+                elements.knowBtn.disabled = true;
+                elements.dontKnowBtn.disabled = true;
+                return;
+            }
+            
+            const currentCard = getCurrentCard();
+            
+            if (!currentCard) {
+                let message = "";
+                let icon = "";
+                
+                if (state.filter === 'unmastered') {
+                    message = "没有未掌握的单词";
+                    icon = "fas fa-check-circle";
+                } else if (state.filter === 'mastered') {
+                    message = "没有已掌握的单词";
+                    icon = "fas fa-trophy";
+                } else {
+                    message = "暂无单词卡片";
+                    icon = "fas fa-plus-circle";
+                }
+                
+                elements.cardFront.innerHTML = `
+                    <div class="empty-state">
+                        <i class="${icon}"></i>
+                        <h3>${message}</h3>
+                        <p>${state.filter === 'all' ? '请添加您的第一个单词卡片' : '请尝试添加或学习其他卡片'}</p>
+                    </div>
+                `;
+                
+                elements.cardBack.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-book-open"></i>
+                        <h3>${message}</h3>
+                        <p>${state.filter === 'all' ? '添加单词后这里将显示单词释义和例句' : '请尝试添加或学习其他卡片'}</p>
+                    </div>
+                `;
+                
+                elements.knowBtn.disabled = true;
+                elements.dontKnowBtn.disabled = true;
+                return;
+            }
+            
+            elements.cardFront.innerHTML = `
+                <div class="word">${currentCard.word}</div>
+                <div class="hint">点击卡片查看释义和例句</div>
+            `;
+            
+            elements.cardBack.innerHTML = `
+                <div class="meaning">${currentCard.meaning}</div>
+                <div class="example">${currentCard.example}</div>
+            `;
+            
+            elements.card.classList.remove('flipped');
+            elements.knowBtn.disabled = false;
+            elements.dontKnowBtn.disabled = false;
+        }
+
+        // 获取当前显示的卡片
+        function getCurrentCard() {
+            let cardsToShow = getFilteredCards();
+            
+            if (cardsToShow.length === 0) {
+                return null;
+            }
+            
+            // 确保索引有效
+            if (state.currentCardIndex >= cardsToShow.length) {
+                state.currentCardIndex = 0;
+            }
+            
+            return cardsToShow[state.currentCardIndex];
+        }
+
+        function getFilteredCards() {
+            let cardsToShow = [...state.cards];
+            
+            if (state.filter === 'unmastered') {
+                cardsToShow = cardsToShow.filter(card => !card.mastered);
+            } else if (state.filter === 'mastered') {
+                cardsToShow = cardsToShow.filter(card => card.mastered);
+            }
+            
+            return cardsToShow;
+        }
+
+        function moveToNextCard() {
+            const cardsToShow = getFilteredCards();
+            
+            if (cardsToShow.length === 0) {
+                state.currentCardIndex = 0;
+                return null;
+            }
+            
+            state.currentCardIndex = (state.currentCardIndex + 1) % cardsToShow.length;
+            return cardsToShow[state.currentCardIndex];
+        }
+
+        // 处理复习结果
+        function handleReview(know) {
+            const currentCard = getCurrentCard();
+            if (!currentCard) return;
+            
+            const now = new Date();
+            currentCard.lastReviewed = now;
+            
+            if (know) {
+                const days = currentCard.mastered ? 30 : 7;
+                currentCard.nextReview = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+                
+                if (!currentCard.mastered) {
+                    currentCard.mastered = true;
+                }
+            } else {
+                currentCard.mastered = false;
+                currentCard.nextReview = new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000);
+            }
+            
+            saveCards();
+            
+            // 显示操作确认
+            const action = know ? '已掌握' : '未掌握';
+            showNotification(`已将 "${currentCard.word}" 标记为 ${action}`);
+            
+            // 移动到下一张卡片
+            moveToNextCard();
+            updateUI();
+        }
+
+        // 添加新卡片
+        function addNewCard(e) {
+            e.preventDefault();
+            
+            const word = elements.wordInput.value.trim();
+            const meaning = elements.meaningInput.value.trim();
+            const example = elements.exampleInput.value.trim();
+            
+            if (!word || !meaning || !example) {
+                alert('请填写所有字段');
+                return;
+            }
+            
+            const newCard = new Flashcard(word, meaning, example);
+            state.cards.push(newCard);
+            saveCards();
+            
+            elements.cardForm.reset();
+            updateUI();
+            
+            showNotification('卡片添加成功！');
+        }
+
+        // 删除卡片
+        function deleteCard(id) {
+            if (confirm('确定要删除这张卡片吗？')) {
+                state.cards = state.cards.filter(card => card.id !== id);
+                saveCards();
+                updateUI();
+                showNotification('卡片已删除');
+            }
+        }
+
+        // 切换掌握状态 - 核心功能
+        function toggleMastery(id) {
+            const card = state.cards.find(card => card.id === id);
+            if (card) {
+                // 切换掌握状态
+                card.mastered = !card.mastered;
+                card.lastReviewed = new Date();
+                
+                // 设置复习时间
+                const days = card.mastered ? 30 : 1;
+                card.nextReview = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+                
+                saveCards();
+                updateUI();
+                
+                // 显示状态变更提示
+                const status = card.mastered ? '已掌握' : '未掌握';
+                showNotification(`已将 "${card.word}" 标记为 ${status}`);
+            }
+        }
+
+        // 显示通知
+        function showNotification(message) {
+            const notification = document.createElement('div');
+            notification.className = 'notification';
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.classList.add('show');
+            }, 100);
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        }
+
+        // 渲染卡片列表
+        function renderCardList() {
+            elements.cardList.innerHTML = '';
+            
+            let cardsToShow = [...state.cards];
+            
+            if (state.filter === 'unmastered') {
+                cardsToShow = cardsToShow.filter(card => !card.mastered);
+            } else if (state.filter === 'mastered') {
+                cardsToShow = cardsToShow.filter(card => card.mastered);
+            }
+            
+            if (cardsToShow.length === 0) {
+                let message = "暂无卡片";
+                let icon = "fas fa-plus-circle";
+                
+                if (state.filter === 'unmastered') {
+                    message = "没有未掌握的单词";
+                    icon = "fas fa-check-circle";
+                } else if (state.filter === 'mastered') {
+                    message = "没有已掌握的单词";
+                    icon = "fas fa-trophy";
+                }
+                
+                elements.cardList.innerHTML = `
+                    <div class="empty-state">
+                        <i class="${icon}"></i>
+                        <h3>${message}</h3>
+                        <p>${state.filter === 'all' ? '请添加您的第一个单词卡片' : '请尝试添加或学习其他卡片'}</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // 按掌握状态排序：未掌握的在前
+            cardsToShow.sort((a, b) => a.mastered - b.mastered);
+            
+            cardsToShow.forEach(card => {
+                const cardElement = document.createElement('div');
+                cardElement.className = `card-item ${card.mastered ? 'mastered' : ''}`;
+                cardElement.dataset.id = card.id;
+                
+                const statusText = card.mastered ? '已掌握' : '未掌握';
+                const toggleText = card.mastered ? '标记为未掌握' : '标记为已掌握';
+                const toggleIcon = card.mastered ? 'fas fa-undo' : 'fas fa-check';
+                
+                cardElement.innerHTML = `
+                    <div class="card-info">
+                        <div style="display: flex; align-items: center; margin-bottom: 5px;">
+                            <div class="card-word">${card.word}</div>
+                            <span class="mastery-status">${statusText}</span>
+                        </div>
+                        <div>${card.meaning}</div>
+                        <div class="example">${card.example}</div>
+                    </div>
+                    <div class="card-actions-list">
+                        <button class="action-btn toggle-mastery" title="${toggleText}">
+                            <i class="${toggleIcon}"></i>
+                        </button>
+                        <button class="action-btn delete-btn" title="删除卡片">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+                
+                elements.cardList.appendChild(cardElement);
+            });
+        }
+
+        // 更新UI - 这是您图片中的核心函数
+        function updateUI() {
+            showCurrentCard();
+            renderCardList();
+            updateStats();
+        }
+
+        // 更新统计信息
+        function updateStats() {
+            const total = state.cards.length;
+            const mastered = state.cards.filter(card => card.mastered).length;
+            const progress = total > 0 ? Math.round((mastered / total) * 100) : 0;
+            
+            elements.totalCardsStat.textContent = total;
+            elements.masteredCardsStat.textContent = mastered;
+            elements.progressPercentStat.textContent = `${progress}%`;
+            elements.progressBar.style.width = `${progress}%`;
+        }
+
+        // 初始化应用
+        window.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
